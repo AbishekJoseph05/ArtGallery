@@ -12,18 +12,18 @@ class ArtistListTableViewCell: UITableViewCell {
     @IBOutlet weak var artistIdLabel: UILabel!
     @IBOutlet weak var artistTitleLabel: UILabel!
     @IBOutlet weak var ArtistDisplayInfoLabel: UILabel!
+    @IBOutlet weak var mainView: UIView!
     
     static let identifier: String = "ArtistListTableViewCell"
 
     override func awakeFromNib() {
         super.awakeFromNib()
+        mainView.layer.cornerRadius = 8
         // Initialization code
     }
 
     override func setSelected(_ selected: Bool, animated: Bool) {
         super.setSelected(selected, animated: animated)
-
-        // Configure the view for the selected state
     }
     
     func setupCell(artistList: ArtistListTableViewModel){

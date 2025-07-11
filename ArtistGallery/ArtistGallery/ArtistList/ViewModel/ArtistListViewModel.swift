@@ -8,64 +8,72 @@
 import UIKit
 
 class ArtistListViewModel {
-    
-    var artists: [artistsListModel] = []
-    
+
     private let service: ServiceCallDelegate
+
+    // Pagination state
+    private var currentPage = 1
+    private var totalPages = 1
+    private var isPaginating = false
+
+    var artists: [artistsListModel] = []
+    var cellDataSource: Observable<[ArtistListTableViewModel]> = Observable(value: [])
+    var onError: Observable<String?> = Observable(value: nil)
+
     init(service: ServiceCallDelegate) {
         self.service = service
     }
-    var cellDataSource: Observable<[ArtistListTableViewModel]> =  Observable(value: [])
-    func fetchUserList() async{
+
+    func fetchUserList(reset: Bool = false) async {
+        if isPaginating { return }
+
+        if reset {
+            currentPage = 1
+            artists.removeAll()
+        }
+
+        isPaginating = true
+        defer { isPaginating = false }
+
+        let urlString = "https://api.artic.edu/api/v1/artworks?page=\(currentPage)"
+
         do {
-            let response: artistsDataModel = try await service.fetchData()
-            self.artists = response.data ?? []
-            self.cellDataSource.value = self.artists.compactMap({ArtistListTableViewModel(artistList: $0)})
-        }catch {
-            print("found error while assinging the data to the user list")
+            let response: artistsDataModel = try await service.fetchData(urlString: urlString)
+            let newArtists = response.data ?? []
+            print("pagiantion data: \(response.pagination?.current_page ?? 1)")
+            self.totalPages = response.pagination?.total_pages ?? 1
+            self.artists += newArtists
+            self.cellDataSource.value = self.artists.compactMap { ArtistListTableViewModel(artistList: $0) }
+            self.currentPage += 1
+            print("list: \(artists)")
+        } catch {
+                if let errorResponse = error as? ErrorResponse {
+                    switch errorResponse {
+                    case .badURL:
+                        self.onError.value = "Invalid request URL."
+                    case .invalidResponse:
+                        self.onError.value = "Server responded with an error."
+                    case .decodingFailed:
+                        self.onError.value = "Failed to decode server response."
+                    case .NodataFound:
+                        self.onError.value = "No data available."
+                    }
+                } else {
+                    self.onError.value = "Something went wrong. Try again later."
+                }
         }
     }
-    
-    func setupTableView(tableView: UITableView){
-        tableView.register(UINib(nibName: ArtistListTableViewCell.identifier, bundle: .main), forCellReuseIdentifier: ArtistListTableViewCell.identifier)
+
+    func setupTableView(tableView: UITableView) {
+        tableView.register(UINib(nibName: ArtistListTableViewCell.identifier, bundle: .main),
+                           forCellReuseIdentifier: ArtistListTableViewCell.identifier)
     }
-    
-    
-    
+
     func numberOfItems() -> Int {
-        return artists.count
+        return cellDataSource.value.count
     }
-}
 
-class ArtistListTableViewModel {
-    
-    var artistDisplayInfo: String?
-    var title: String?
-    var id: Int?
-    
-    init(artistList: artistsListModel) {
-        self.artistDisplayInfo = artistList.artist_display
-        self.title = artistList.title
-        self.id = artistList.id
-    }
-}
-
-class Observable<T> {
-    
-    private var valueChanged: ((T)-> Void)?
-    
-    var value: T {
-        didSet {
-            valueChanged?(value)
-        }
-    }
-    
-    init(value: T) {
-        self.value = value
-    }
-    
-    func bind(_ lister: @escaping (T) -> Void){
-        lister(value)
-        valueChanged = lister
+    func shouldLoadNextPage(index: Int) -> Bool {
+        return index == cellDataSource.value.count - 1 && currentPage <= totalPages
     }
 }

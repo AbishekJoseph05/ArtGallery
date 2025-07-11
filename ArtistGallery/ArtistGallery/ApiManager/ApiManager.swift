@@ -14,13 +14,14 @@ enum ErrorResponse: Error {
     case NodataFound
 }
 
+
 protocol ServiceCallDelegate {
-    func fetchData<T: Codable>() async throws -> T
+    func fetchData<T: Codable>(urlString: String) async throws -> T
 }
 
 public class ApiCaller: ServiceCallDelegate{
-    func fetchData<T: Codable>() async throws -> T{
-        guard let url = URL(string: "https://api.artic.edu/api/v1/artworks") else {
+    func fetchData<T: Codable>(urlString: String) async throws -> T{
+        guard let url = URL(string: urlString) else {
             throw ErrorResponse.badURL
         }
         let (data, response) = try await URLSession.shared.data(for: URLRequest(url: url))
